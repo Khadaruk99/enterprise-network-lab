@@ -1,0 +1,23 @@
+# GNS3 project files
+*.gns3
+*.gns3project
+project-files/
+
+# Packet Tracer
+*.pkt
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
