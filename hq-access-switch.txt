@@ -1,0 +1,112 @@
+! ============================================================
+! HQ-SW-ACC Configuration
+! Enterprise Network Lab - HQ Access Switch
+! ============================================================
+! Device: Cisco Layer 2 Access Switch
+! Purpose: End-user port assignments, Port Security
+! ============================================================
+
+enable
+configure terminal
+hostname HQ-SW-ACC
+no ip domain-lookup
+
+! --- VTY ---
+line vty 0 15
+ login local
+
+username admin privilege 15 secret cisco123
+
+! ============================================================
+! VLAN DATABASE
+! ============================================================
+vlan 10
+ name IT_Department
+vlan 20
+ name HR_Department
+vlan 30
+ name Guest_Network
+vlan 99
+ name Management_Native
+
+! ============================================================
+! TRUNK TO L3 SWITCH
+! ============================================================
+interface GigabitEthernet0/0
+ description Trunk_to_HQ-SW-L3
+ switchport mode trunk
+ switchport trunk native vlan 99
+ switchport trunk allowed vlan 10,20,30,99
+ spanning-tree portfast trunk
+ no shutdown
+
+! ============================================================
+! ACCESS PORTS - IT DEPARTMENT (VLAN 10)
+! ============================================================
+interface range GigabitEthernet0/1 - 8
+ description IT_Department_Ports
+ switchport mode access
+ switchport access vlan 10
+ switchport port-security
+ switchport port-security maximum 2
+ switchport port-security mac-address sticky
+ switchport port-security violation restrict
+ spanning-tree portfast
+ no shutdown
+
+! ============================================================
+! ACCESS PORTS - HR DEPARTMENT (VLAN 20)
+! ============================================================
+interface range GigabitEthernet0/9 - 16
+ description HR_Department_Ports
+ switchport mode access
+ switchport access vlan 20
+ switchport port-security
+ switchport port-security maximum 2
+ switchport port-security mac-address sticky
+ switchport port-security violation restrict
+ spanning-tree portfast
+ no shutdown
+
+! ============================================================
+! ACCESS PORTS - GUEST NETWORK (VLAN 30)
+! ============================================================
+interface range GigabitEthernet0/17 - 20
+ description Guest_Ports
+ switchport mode access
+ switchport access vlan 30
+ switchport port-security
+ switchport port-security maximum 1
+ switchport port-security mac-address sticky
+ switchport port-security violation shutdown
+ spanning-tree portfast
+ no shutdown
+
+! ============================================================
+! MANAGEMENT INTERFACE
+! ============================================================
+interface Vlan99
+ ip address 10.1.99.2 255.255.255.0
+ no shutdown
+
+ip default-gateway 10.1.99.1
+
+! ============================================================
+! ERRDISABLE RECOVERY (Auto-recover from port-security violations)
+! ============================================================
+errdisable recovery cause psecure-violation
+errdisable recovery interval 300
+
+! ============================================================
+! SAVE
+! ============================================================
+end
+write memory
+
+! ============================================================
+! VERIFICATION COMMANDS:
+! ============================================================
+! show vlan brief
+! show port-security
+! show port-security interface Gi0/1
+! show interfaces status

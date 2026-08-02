@@ -1,0 +1,90 @@
+! ============================================================
+! BR-SW-L3 Configuration
+! Branch Office Layer 3 Switch
+! ============================================================
+
+enable
+configure terminal
+hostname BR-SW-L3
+no ip domain-lookup
+
+ip routing
+
+line vty 0 15
+ login local
+
+username admin privilege 15 secret cisco123
+
+! ============================================================
+! VLANS
+! ============================================================
+vlan 40
+ name Sales_Team
+vlan 50
+ name Management
+vlan 99
+ name Management_Native
+
+! ============================================================
+! SVIs
+! ============================================================
+interface Vlan40
+ description Sales_Gateway
+ ip address 10.2.40.1 255.255.255.0
+ ip helper-address 10.2.50.10
+ no shutdown
+
+interface Vlan50
+ description Management_Gateway
+ ip address 10.2.50.1 255.255.255.0
+ ip helper-address 10.2.50.10
+ no shutdown
+
+interface Vlan99
+ description Management
+ ip address 10.2.99.1 255.255.255.0
+ no shutdown
+
+! ============================================================
+! UPLINK TO BRANCH ROUTER
+! ============================================================
+interface GigabitEthernet0/0
+ description Uplink_to_BR-RTR
+ no switchport
+ ip address 10.2.1.2 255.255.255.252
+ no shutdown
+
+! ============================================================
+! TRUNK TO ACCESS SWITCH
+! ============================================================
+interface GigabitEthernet0/1
+ description Trunk_to_BR-SW-ACC
+ switchport trunk encapsulation dot1q
+ switchport mode trunk
+ switchport trunk native vlan 99
+ switchport trunk allowed vlan 40,50,99
+ no shutdown
+
+! ============================================================
+! OSPF
+! ============================================================
+router ospf 1
+ router-id 2.2.2.3
+ network 10.2.1.0 0.0.0.3 area 0
+ network 10.2.40.0 0.0.0.255 area 0
+ network 10.2.50.0 0.0.0.255 area 0
+ network 10.2.99.0 0.0.0.255 area 0
+ passive-interface Vlan40
+ passive-interface Vlan50
+ passive-interface Vlan99
+
+! ============================================================
+! SAVE
+! ============================================================
+end
+write memory
+
+! VERIFICATION:
+! show ip route
+! show ip ospf neighbor
+! show vlan brief

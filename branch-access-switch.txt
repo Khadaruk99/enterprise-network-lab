@@ -1,0 +1,89 @@
+! ============================================================
+! BR-SW-ACC Configuration
+! Branch Office Access Switch
+! ============================================================
+
+enable
+configure terminal
+hostname BR-SW-ACC
+no ip domain-lookup
+
+line vty 0 15
+ login local
+
+username admin privilege 15 secret cisco123
+
+! ============================================================
+! VLANS
+! ============================================================
+vlan 40
+ name Sales_Team
+vlan 50
+ name Management
+vlan 99
+ name Management_Native
+
+! ============================================================
+! TRUNK TO L3 SWITCH
+! ============================================================
+interface GigabitEthernet0/0
+ description Trunk_to_BR-SW-L3
+ switchport mode trunk
+ switchport trunk native vlan 99
+ switchport trunk allowed vlan 40,50,99
+ spanning-tree portfast trunk
+ no shutdown
+
+! ============================================================
+! ACCESS PORTS - SALES (VLAN 40)
+! ============================================================
+interface range GigabitEthernet0/1 - 12
+ description Sales_Ports
+ switchport mode access
+ switchport access vlan 40
+ switchport port-security
+ switchport port-security maximum 2
+ switchport port-security mac-address sticky
+ switchport port-security violation restrict
+ spanning-tree portfast
+ no shutdown
+
+! ============================================================
+! ACCESS PORTS - MANAGEMENT (VLAN 50)
+! ============================================================
+interface range GigabitEthernet0/13 - 20
+ description Management_Ports
+ switchport mode access
+ switchport access vlan 50
+ switchport port-security
+ switchport port-security maximum 2
+ switchport port-security mac-address sticky
+ switchport port-security violation restrict
+ spanning-tree portfast
+ no shutdown
+
+! ============================================================
+! MANAGEMENT
+! ============================================================
+interface Vlan99
+ ip address 10.2.99.2 255.255.255.0
+ no shutdown
+
+ip default-gateway 10.2.99.1
+
+! ============================================================
+! ERRDISABLE RECOVERY
+! ============================================================
+errdisable recovery cause psecure-violation
+errdisable recovery interval 300
+
+! ============================================================
+! SAVE
+! ============================================================
+end
+write memory
+
+! VERIFICATION:
+! show vlan brief
+! show port-security
+! show interfaces status

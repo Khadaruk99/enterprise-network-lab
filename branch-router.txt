@@ -1,0 +1,127 @@
+! ============================================================
+! BR-RTR Configuration
+! Enterprise Network Lab - Branch Office Router
+! ============================================================
+! Device: Cisco ISR-style Router
+! Purpose: WAN edge, NAT, VPN, OSPF routing for branch
+! ============================================================
+
+enable
+configure terminal
+hostname BR-RTR
+no ip domain-lookup
+service timestamps debug datetime msec
+service timestamps log datetime msec
+service password-encryption
+
+enable secret class
+
+line console 0
+ logging synchronous
+ login local
+line vty 0 4
+ login local
+ transport input ssh
+
+username admin privilege 15 secret cisco123
+
+ip domain-name enterprise.lab
+crypto key generate rsa general-keys modulus 2048
+ip ssh version 2
+
+! ============================================================
+! INTERFACES
+! ============================================================
+
+! WAN to ISP
+interface GigabitEthernet0/0
+ description WAN_Link_to_ISP
+ ip address 198.51.100.2 255.255.255.252
+ ip nat outside
+ no shutdown
+
+! LAN to Branch L3 Switch
+interface GigabitEthernet0/1
+ description LAN_Link_to_BR-SW-L3
+ ip address 10.2.1.1 255.255.255.252
+ ip nat inside
+ no shutdown
+
+! Loopback
+interface Loopback0
+ description Router_ID
+ ip address 2.2.2.2 255.255.255.255
+ no shutdown
+
+! ============================================================
+! OSPF
+! ============================================================
+router ospf 1
+ router-id 2.2.2.2
+ network 10.2.1.0 0.0.0.3 area 0
+ network 10.2.40.0 0.0.0.255 area 0
+ network 10.2.50.0 0.0.0.255 area 0
+ passive-interface GigabitEthernet0/0
+
+! ============================================================
+! NAT / PAT
+! ============================================================
+access-list 1 permit 10.2.40.0 0.0.0.255
+access-list 1 permit 10.2.50.0 0.0.0.255
+access-list 1 permit 10.1.0.0 0.0.255.255
+
+ip nat inside source list 1 interface GigabitEthernet0/0 overload
+
+! Default route
+ip route 0.0.0.0 0.0.0.0 198.51.100.1
+
+! ============================================================
+! VPN - Site-to-Site IPSec (Mirror of HQ)
+! ============================================================
+crypto isakmp policy 10
+ encr aes 256
+ hash sha256
+ authentication pre-share
+ group 14
+ lifetime 86400
+
+crypto isakmp key SECURE_VPN_KEY address 203.0.113.2
+
+crypto ipsec transform-set VPN-TS esp-aes 256 esp-sha-hmac
+ mode tunnel
+
+access-list 101 permit ip 10.2.0.0 0.0.255.255 10.1.0.0 0.0.255.255
+
+crypto map VPN-MAP 10 ipsec-isakmp
+ set peer 203.0.113.2
+ set transform-set VPN-TS
+ match address 101
+
+interface GigabitEthernet0/0
+ crypto map VPN-MAP
+
+! ============================================================
+! LOGGING & MONITORING
+! ============================================================
+logging buffered 4096
+logging trap informational
+logging host 10.2.50.10
+
+snmp-server group ADMIN-GROUP v3 priv
+snmp-server user admin ADMIN-GROUP v3 auth sha SNMP_AUTH_PASS priv aes 128 SNMP_PRIV_PASS
+snmp-server host 10.2.50.10 version 3 priv admin
+
+! ============================================================
+! SAVE
+! ============================================================
+end
+write memory
+
+! ============================================================
+! VERIFICATION:
+! ============================================================
+! show ip interface brief
+! show ip route
+! show crypto isakmp sa
+! show crypto ipsec sa
+! ping 10.1.10.1 source 10.2.40.1

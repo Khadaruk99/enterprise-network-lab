@@ -1,0 +1,140 @@
+! ============================================================
+! HQ-RTR Configuration
+! Enterprise Network Lab - HeadQuarters Router
+! ============================================================
+! Device: Cisco ISR-style Router (IOSv or similar)
+! Purpose: WAN edge, NAT, VPN, OSPF routing
+! ============================================================
+
+! --- Basic Device Setup ---
+enable
+configure terminal
+hostname HQ-RTR
+no ip domain-lookup
+service timestamps debug datetime msec
+service timestamps log datetime msec
+service password-encryption
+
+! --- Enable Secret ---
+enable secret class
+
+! --- Console & VTY Lines ---
+line console 0
+ logging synchronous
+ login local
+line vty 0 4
+ login local
+ transport input ssh
+
+! --- Local User ---
+username admin privilege 15 secret cisco123
+
+! --- SSH Configuration ---
+ip domain-name enterprise.lab
+crypto key generate rsa general-keys modulus 2048
+ip ssh version 2
+
+! --- Interface: WAN to ISP ---
+interface GigabitEthernet0/0
+ description WAN_Link_to_ISP
+ ip address 203.0.113.2 255.255.255.252
+ ip nat outside
+ no shutdown
+
+! --- Interface: LAN to HQ L3 Switch ---
+interface GigabitEthernet0/1
+ description LAN_Link_to_HQ-SW-L3
+ ip address 10.1.1.1 255.255.255.252
+ ip nat inside
+ no shutdown
+
+! --- Loopback for Router ID ---
+interface Loopback0
+ description Router_ID
+ ip address 1.1.1.1 255.255.255.255
+ no shutdown
+
+! --- OSPF Configuration ---
+router ospf 1
+ router-id 1.1.1.1
+ network 10.1.1.0 0.0.0.3 area 0
+ network 10.1.10.0 0.0.0.255 area 0
+ network 10.1.20.0 0.0.0.255 area 0
+ network 10.1.30.0 0.0.0.255 area 0
+ passive-interface GigabitEthernet0/0
+ default-information originate
+
+! --- NAT / PAT Configuration ---
+! Define inside networks
+access-list 1 permit 10.1.10.0 0.0.0.255
+access-list 1 permit 10.1.20.0 0.0.0.255
+access-list 1 permit 10.1.30.0 0.0.0.255
+access-list 1 permit 10.2.40.0 0.0.0.255
+access-list 1 permit 10.2.50.0 0.0.0.255
+
+! NAT overload (PAT) for internet access
+ip nat inside source list 1 interface GigabitEthernet0/0 overload
+
+! --- NAT Exemption for VPN Traffic ---
+! Don't NAT traffic destined for the branch office
+access-list 100 permit ip 10.1.0.0 0.0.255.255 10.2.0.0 0.0.255.255
+
+! --- Default Route to ISP ---
+ip route 0.0.0.0 0.0.0.0 203.0.113.1
+
+! ============================================================
+! VPN CONFIGURATION - Site-to-Site IPSec
+! ============================================================
+
+! --- ISAKMP / IKE Phase 1 Policy ---
+crypto isakmp policy 10
+ encr aes 256
+ hash sha256
+ authentication pre-share
+ group 14
+ lifetime 86400
+
+! --- ISAKMP Key ---
+crypto isakmp key SECURE_VPN_KEY address 198.51.100.2
+
+! --- IPSec Transform Set (Phase 2) ---
+crypto ipsec transform-set VPN-TS esp-aes 256 esp-sha-hmac
+ mode tunnel
+
+! --- Crypto ACL - Define interesting traffic ---
+access-list 101 permit ip 10.1.0.0 0.0.255.255 10.2.0.0 0.0.255.255
+
+! --- Crypto Map ---
+crypto map VPN-MAP 10 ipsec-isakmp
+ set peer 198.51.100.2
+ set transform-set VPN-TS
+ match address 101
+
+! --- Apply Crypto Map to WAN Interface ---
+interface GigabitEthernet0/0
+ crypto map VPN-MAP
+
+! --- Logging ---
+logging buffered 4096
+logging trap informational
+logging host 10.1.10.10
+
+! --- SNMP v3 ---
+snmp-server group ADMIN-GROUP v3 priv
+snmp-server user admin ADMIN-GROUP v3 auth sha SNMP_AUTH_PASS priv aes 128 SNMP_PRIV_PASS
+snmp-server host 10.1.10.10 version 3 priv admin
+
+! --- Save ---
+end
+write memory
+
+! ============================================================
+! VERIFICATION COMMANDS (run these to test):
+! ============================================================
+! show ip interface brief
+! show ip route ospf
+! show ip nat translations
+! show crypto isakmp sa
+! show crypto ipsec sa
+! show crypto map
+! ping 10.2.40.1 source 10.1.10.1
