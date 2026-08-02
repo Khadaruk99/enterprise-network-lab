@@ -270,8 +270,8 @@ This project is licensed under the MIT License — feel free to use, modify, and
 
 If you found this project useful or have suggestions for improvement, let's connect!
 
-- LinkedIn: [Your LinkedIn URL]
-- Email: your.email@example.com
+- LinkedIn: linkedin.com/in/khader-ali-adam-621397425
+- Email: itdevelops.uk99@gmail.com
 
 ---
 
